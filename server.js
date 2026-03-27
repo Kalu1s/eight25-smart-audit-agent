@@ -4,7 +4,8 @@ const cheerio = require("cheerio");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
-
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -185,47 +186,62 @@ Generate 3–5 prioritized recommendations. Be specific, non-generic, and refere
   return { systemPrompt, userPrompt };
 }
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-async function analyzeWithGemini(metrics, apiKey) {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  // Using gemini-1.5-flash for speed and efficiency as per current 2026 standards
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash",
-    generationConfig: { responseMimeType: "application/json" } // Ensures valid JSON
-  });
+async function analyzeWithGemini(metrics) {
+  // 1. Initialize the model using the standard SDK
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const systemPrompt = `You are an expert Website Strategist at EIGHT25MEDIA. 
-  Analyze the provided metrics and return a JSON audit. 
-  GUIDELINES:
-  1. Ground every insight in the metrics.
-  2. Be specific (e.g., cite 'Word count is 312' not 'Content is short').
-  3. Provide 3-5 prioritized recommendations.`;
+  const prompt = `You are an expert Website Strategist. Analyze these metrics and return a JSON audit.
+DO NOT wrap the response in an "audit" or "report" tag. Return the EXACT JSON structure below, starting with the root keys:
 
-  const userPrompt = `Input Metrics: ${JSON.stringify(metrics)}`;
+{
+  "seoStructure": { "score": 8, "summary": "2 sentences about SEO.", "issues": ["Issue 1"] },
+  "messagingClarity": { "score": 7, "summary": "2 sentences about messaging.", "issues": ["Issue 1"] },
+  "ctaUsage": { "score": 6, "summary": "2 sentences about CTAs.", "issues": ["Issue 1"] },
+  "contentDepth": { "score": 9, "summary": "2 sentences about content.", "issues": ["Issue 1"] },
+  "uxConcerns": { "score": 5, "summary": "2 sentences about UX.", "issues": ["Issue 1"] },
+  "recommendations": [
+    {
+      "priority": 1,
+      "title": "Clear Actionable Title",
+      "details": "Detailed explanation.",
+      "impact": "High"
+    }
+  ]
+}
+
+<extracted_metrics>
+URL: ${metrics.url}
+Word Count: ${metrics.wordCount}
+H1s: ${metrics.headings.h1.join(" | ") || "(none)"}
+CTA Count: ${metrics.ctaCount}
+Missing Image Alt Text: ${metrics.images.missingAltPct}%
+</extracted_metrics>
+`;
 
   const startTime = Date.now();
+  
+  // 2. Generate content using the exact syntax that worked earlier
   const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json" }
   });
-  const response = await result.response;
-  const rawOutput = response.text();
-  const latencyMs = Date.now() - startTime;
 
-  const parsed = JSON.parse(rawOutput);
+  const rawOutput = result.response.text();
+  let parsed = JSON.parse(rawOutput.replace(/```json|```/g, "").trim());
 
-  // Maintain the promptLog structure required by the brief [cite: 48, 52]
-  const promptLog = {
-    timestamp: new Date().toISOString(),
-    model: "gemini-1.5-flash",
-    systemPrompt,
-    userPrompt,
-    rawModelOutput: rawOutput,
-    parsedOutput: parsed,
-    latencyMs
+  // 🚨 BULLETPROOF PARSING LAYER 🚨
+  if (parsed.audit && !parsed.seoStructure) {
+    parsed = parsed.audit;
+  }
+  if (parsed.analysis && !parsed.seoStructure) {
+    parsed = parsed.analysis;
+  }
+
+  return { 
+    analysis: parsed, 
+    promptLog: { promptUsed: prompt, parsedOutput: parsed, latencyMs: Date.now() - startTime } 
   };
-
-  return { analysis: parsed, promptLog };
 }
 
 // ─────────────────────────────────────────────
@@ -272,6 +288,6 @@ app.post("/api/audit", async (req, res) => {
 // START
 // ─────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🔍 Website Audit Tool running → http://localhost:${PORT}`);
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🚨🚨🚨 THE NEW SERVER V2 IS FINALLY ALIVE!!! 🚨🚨🚨");
 });

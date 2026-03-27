@@ -121,65 +121,47 @@
     }
   }
  
-  function renderReport(data) {
-    const m        = data.metrics  || {};
-    const analysis = data.analysis || {};  // FIX: was data.analysis?.audit — no .audit wrapper exists
- 
+function renderReport(data) {
+    const m = data.metrics || {};
+    
+    // 1. AUTO-UNWRAP: Sometimes the AI nests the data inside another object. 
+    // This finds the real data no matter where the AI hid it.
+    let a = data.analysis || {};
+    if (a.analysis) a = a.analysis;
+    if (a.audit) a = a.audit;
+    if (a.report) a = a.report;
+    if (a.results) a = a.results;
+
     // ── 1. All 9 Metrics ─────────────────────────────────────
     const altPct = m.images?.missingAltPct ?? 0;
     document.getElementById("statsGrid").innerHTML = `
-      <div class="stat-card">
-        <div class="stat-label">Word Count</div>
-        <div class="stat-value ${m.wordCount < 300 ? 'warn' : 'ok'}">${(m.wordCount||0).toLocaleString()}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Headings (H1/H2/H3)</div>
-        <div class="stat-value">${m.headingCounts?.h1||0}/${m.headingCounts?.h2||0}/${m.headingCounts?.h3||0}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">CTAs Found</div>
-        <div class="stat-value ${(m.ctaCount||0)===0?'warn':''}">${m.ctaCount||0}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Internal Links</div>
-        <div class="stat-value">${m.links?.internal||0}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">External Links</div>
-        <div class="stat-value">${m.links?.external||0}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Images</div>
-        <div class="stat-value">${m.images?.total||0}</div>
-        <div class="stat-sub">${m.images?.missingAltCount||0} missing alt</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Missing Alt %</div>
-        <div class="stat-value ${altPct > 30 ? 'warn' : 'ok'}">${altPct}%</div>
-      </div>
-      <div class="meta-card">
-        <div class="stat-label">Meta Title</div>
-        <div class="stat-value ${m.metaTitle ? '' : 'warn'}">${m.metaTitle || '(missing)'}</div>
-      </div>
-      <div class="meta-card">
-        <div class="stat-label">Meta Description</div>
-        <div class="stat-value ${m.metaDescription ? '' : 'warn'}">${m.metaDescription || '(missing)'}</div>
-      </div>
+      <div class="stat-card"><div class="stat-label">Word Count</div><div class="stat-value ${m.wordCount < 300 ? 'warn' : 'ok'}">${(m.wordCount||0).toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">Headings (H1/H2/H3)</div><div class="stat-value">${m.headingCounts?.h1||0}/${m.headingCounts?.h2||0}/${m.headingCounts?.h3||0}</div></div>
+      <div class="stat-card"><div class="stat-label">CTAs Found</div><div class="stat-value ${(m.ctaCount||0)===0?'warn':''}">${m.ctaCount||0}</div></div>
+      <div class="stat-card"><div class="stat-label">Internal Links</div><div class="stat-value">${m.links?.internal||0}</div></div>
+      <div class="stat-card"><div class="stat-label">External Links</div><div class="stat-value">${m.links?.external||0}</div></div>
+      <div class="stat-card"><div class="stat-label">Images</div><div class="stat-value">${m.images?.total||0}</div><div class="stat-sub">${m.images?.missingAltCount||0} missing alt</div></div>
+      <div class="stat-card"><div class="stat-label">Missing Alt %</div><div class="stat-value ${altPct > 30 ? 'warn' : 'ok'}">${altPct}%</div></div>
+      <div class="meta-card"><div class="stat-label">Meta Title</div><div class="stat-value ${m.metaTitle ? '' : 'warn'}">${m.metaTitle || '(missing)'}</div></div>
+      <div class="meta-card"><div class="stat-label">Meta Description</div><div class="stat-value ${m.metaDescription ? '' : 'warn'}">${m.metaDescription || '(missing)'}</div></div>
     `;
- 
-    // ── 2. AI Scores — real 1-10 values from server ──────────
+
+    // ── 2. AI Scores (With Fallback Keys) ──────────────────
     const categories = [
-      { key: "seoStructure",     label: "SEO Structure"    },
-      { key: "messagingClarity", label: "Messaging Clarity"},
-      { key: "ctaUsage",         label: "CTA Usage"        },
-      { key: "contentDepth",     label: "Content Depth"    },
-      { key: "uxConcerns",       label: "UX / Structural"  },
+      { key: "seoStructure", alt: "seo", label: "SEO Structure" },
+      { key: "messagingClarity", alt: "messaging", label: "Messaging Clarity"},
+      { key: "ctaUsage", alt: "cta", label: "CTA Usage" },
+      { key: "contentDepth", alt: "content", label: "Content Depth" },
+      { key: "uxConcerns", alt: "ux", label: "UX / Structural" },
     ];
+
     document.getElementById("catList").innerHTML = categories.map((c, i) => {
-      const cat   = analysis[c.key] || {};
+      // Look for the exact key, OR the alt key, OR default to an empty object
+      const cat = a[c.key] || a[c.alt] || {}; 
       const score = cat.score ?? "–";
-      const cls   = typeof score === "number" ? scoreClass(score) : "";
-      const preview = (cat.summary || "").slice(0, 90);
+      const cls = typeof score === "number" ? scoreClass(score) : "";
+      const preview = (cat.summary || "No summary provided.").slice(0, 90);
+      
       return `
         <div class="cat-item ${i === 0 ? 'active' : ''}" onclick="showDetail('${c.key}', this)">
           <div>
@@ -189,26 +171,64 @@
           <div class="cat-score ${cls}">${score}<span style="font-size:12px;font-weight:400">/10</span></div>
         </div>`;
     }).join("");
- 
+
     showDetail("seoStructure", document.querySelector(".cat-item"));
- 
-    // ── 3. Recommendations — correct key ────────────────────
-    // FIX: was audit.prioritized_recommendations — correct key is analysis.recommendations
-    const recs = analysis.recommendations || [];
-    document.getElementById("recList").innerHTML = recs.length
-      ? recs.map(r => `
+
+    // ── 3. Recommendations (With Fallback Keys) ─────────────
+    // AI might name the array "prioritized_recommendations" or "recs"
+    const recArray = a.recommendations || a.prioritized_recommendations || a.recs || [];
+    
+    document.getElementById("recList").innerHTML = recArray.length > 0
+      ? recArray.map((r, i) => {
+          // AI might use "title" instead of "recommendation", "description" instead of "reasoning"
+          const title = r.recommendation || r.title || r.action || "Action Required";
+          const text = r.reasoning || r.description || r.details || r.why || "No detailed reasoning provided.";
+          const impact = r.impact || r.expected_impact || r.benefit || "High";
+          const priority = r.priority || (i + 1);
+          const metric = r.metricRef || r.metric || "";
+
+          return `
           <div class="rec-item">
-            <div class="rec-priority">PRIORITY ${r.priority}</div>
-            <div class="rec-title">${r.recommendation}</div>
-            <div class="rec-text">${r.reasoning}</div>
-            <div class="rec-impact">↑ ${r.impact}</div>
-            ${r.metricRef ? `<div class="rec-metric">Metric: ${r.metricRef}</div>` : ""}
-          </div>`).join("")
+            <div class="rec-priority">PRIORITY ${priority}</div>
+            <div class="rec-title">${title}</div>
+            <div class="rec-text">${text}</div>
+            <div class="rec-impact">↑ ${impact}</div>
+            ${metric ? `<div class="rec-metric">Metric: ${metric}</div>` : ""}
+          </div>`;
+        }).join("")
       : "<p style='color:#999;font-size:13px'>No recommendations returned.</p>";
- 
-    document.getElementById("logTrace").textContent = JSON.stringify(data.promptLog, null, 2);
+
+    // Update the Trace Log so you can see exactly what the AI outputted
+    const logData = data.promptLog || data;
+    document.getElementById("logTrace").textContent = JSON.stringify(logData, null, 2);
+    
     document.getElementById("results").style.display = "block";
     document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function showDetail(key, el) {
+    if (!reportData) return;
+    
+    // Find the unwrapped analysis object again
+    let a = reportData.analysis || {};
+    if (a.analysis) a = a.analysis;
+    if (a.audit) a = a.audit;
+    if (a.report) a = a.report;
+
+    const altKeys = { seoStructure: "seo", messagingClarity: "messaging", ctaUsage: "cta", contentDepth: "content", uxConcerns: "ux" };
+    const cat = a[key] || a[altKeys[key]] || {};
+    
+    document.querySelectorAll(".cat-item").forEach(i => i.classList.remove("active"));
+    if (el) el.classList.add("active");
+    
+    const panel = document.getElementById("detailPanel");
+    const issuesList = cat.issues || cat.improvements || [];
+    
+    panel.innerHTML = `
+      <h4>${key.replace(/([A-Z])/g, ' $1').trim()}</h4>
+      <p>${cat.summary || "No summary available."}</p>
+      <ul>${issuesList.map(i => `<li>${i}</li>`).join("")}</ul>`;
+    panel.style.display = "block";
   }
  
   function showDetail(key, el) {
