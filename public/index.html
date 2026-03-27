@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audit Report — EIGHT25</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #ffffff; --text: #000000; --sub: #666666;
+      --border: #eeeeee; --accent: #000000;
+      --font-sans: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-sans); line-height: 1.5; padding: 60px 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    header { margin-bottom: 60px; border-bottom: 4px solid var(--accent); padding-bottom: 20px; }
+    .logo { font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: -1px; }
+    .input-section { margin-bottom: 60px; }
+    input { width: 100%; border: none; border-bottom: 2px solid var(--border); padding: 15px 0; font-size: 20px; font-family: var(--font-sans); outline: none; margin-bottom: 20px; }
+    button { background: var(--accent); color: #fff; border: none; padding: 12px 30px; font-weight: 600; cursor: pointer; text-transform: uppercase; font-size: 13px; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #results { display: none; }
+    .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--sub); margin: 40px 0 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+    .stat-card { padding: 20px; border: 1px solid var(--border); }
+    .stat-label { font-size: 11px; color: var(--sub); text-transform: uppercase; margin-bottom: 4px; }
+    .stat-value { font-size: 28px; font-weight: 800; font-family: var(--font-mono); }
+    .stat-value.warn { color: #ff3b30; }
+    .stat-value.ok   { color: #00c853; }
+    .stat-sub { font-size: 11px; color: var(--sub); margin-top: 4px; font-family: var(--font-mono); }
+    .meta-card { grid-column: span 3; padding: 16px 20px; border: 1px solid var(--border); }
+    .meta-card .stat-value { font-size: 14px; word-break: break-all; }
+    .cat-list { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .cat-item { padding: 20px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .cat-item:last-child { border-bottom: none; }
+    .cat-item:hover, .cat-item.active { background: #f9f9f9; }
+    .cat-name { font-weight: 600; font-size: 14px; }
+    .cat-preview { font-size: 12px; color: var(--sub); margin-top: 2px; max-width: 500px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cat-score { font-family: var(--font-mono); font-weight: 800; font-size: 20px; }
+    .cat-score.high { color: #00c853; }
+    .cat-score.mid  { color: #ff9500; }
+    .cat-score.low  { color: #ff3b30; }
+    #detailPanel { display: none; background: #f9f9f9; padding: 25px; border: 1px solid var(--border); border-top: none; }
+    #detailPanel h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--sub); margin-bottom: 12px; }
+    #detailPanel p { font-size: 14px; margin-bottom: 16px; }
+    #detailPanel ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    #detailPanel li { font-size: 13px; padding: 10px 14px; border-left: 3px solid #000; background: #fff; }
+    .rec-item { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .rec-priority { font-family: var(--font-mono); font-size: 10px; font-weight: 800; color: #ff3b30; margin-bottom: 6px; }
+    .rec-title { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+    .rec-text { font-size: 13px; color: #444; margin-bottom: 4px; }
+    .rec-impact { font-size: 12px; color: #00c853; font-weight: 600; margin-top: 6px; }
+    .rec-metric { font-size: 11px; font-family: var(--font-mono); color: var(--sub); margin-top: 4px; }
+    #logTrace { display: none; font-family: var(--font-mono); font-size: 11px; background: #f4f4f4; padding: 20px; margin-top: 16px; white-space: pre-wrap; max-height: 500px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header><div class="logo">EIGHT25<span>MEDIA</span></div></header>
+ 
+  <div class="input-section">
+    <input id="urlInput" type="text" placeholder="https://www.eight25media.com" />
+    <button id="runBtn" onclick="runAudit()">Generate Report</button>
+  </div>
+ 
+  <div id="results">
+    <div class="section-title">Quantitative Metrics</div>
+    <div class="stats-grid" id="statsGrid"></div>
+ 
+    <div class="section-title">AI Analysis &amp; Scores</div>
+    <div class="cat-list" id="catList"></div>
+    <div id="detailPanel"></div>
+ 
+    <div class="section-title">Key Recommendations</div>
+    <div id="recList"></div>
+ 
+    <div class="section-title" onclick="toggleLog()" style="cursor:pointer">Show Audit Trace +</div>
+    <pre id="logTrace"></pre>
+  </div>
+</div>
+ 
+<script>
+  let reportData = null;
+ 
+  function scoreClass(s) {
+    if (s >= 7) return "high";
+    if (s >= 4) return "mid";
+    return "low";
+  }
+ 
+  async function runAudit() {
+    const url = document.getElementById("urlInput").value.trim();
+    const btn = document.getElementById("runBtn");
+    if (!url) return alert("Enter a URL");
+ 
+    btn.disabled = true;
+    btn.textContent = "Analyzing Content...";
+    document.getElementById("results").style.display = "none";
+ 
+    try {
+      const res = await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+ 
+      const data = await res.json();
+      console.log("Full API Response:", data);
+ 
+      if (!res.ok) throw new Error(data.error || "Server error");
+ 
+      reportData = data;
+      renderReport(data);
+    } catch (err) {
+      alert("Audit Failed: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Generate Report";
+    }
+  }
+ 
+  function renderReport(data) {
+    const m        = data.metrics  || {};
+    const analysis = data.analysis || {};  // FIX: was data.analysis?.audit — no .audit wrapper exists
+ 
+    // ── 1. All 9 Metrics ─────────────────────────────────────
+    const altPct = m.images?.missingAltPct ?? 0;
+    document.getElementById("statsGrid").innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Word Count</div>
+        <div class="stat-value ${m.wordCount < 300 ? 'warn' : 'ok'}">${(m.wordCount||0).toLocaleString()}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Headings (H1/H2/H3)</div>
+        <div class="stat-value">${m.headingCounts?.h1||0}/${m.headingCounts?.h2||0}/${m.headingCounts?.h3||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">CTAs Found</div>
+        <div class="stat-value ${(m.ctaCount||0)===0?'warn':''}">${m.ctaCount||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Internal Links</div>
+        <div class="stat-value">${m.links?.internal||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">External Links</div>
+        <div class="stat-value">${m.links?.external||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Images</div>
+        <div class="stat-value">${m.images?.total||0}</div>
+        <div class="stat-sub">${m.images?.missingAltCount||0} missing alt</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Missing Alt %</div>
+        <div class="stat-value ${altPct > 30 ? 'warn' : 'ok'}">${altPct}%</div>
+      </div>
+      <div class="meta-card">
+        <div class="stat-label">Meta Title</div>
+        <div class="stat-value ${m.metaTitle ? '' : 'warn'}">${m.metaTitle || '(missing)'}</div>
+      </div>
+      <div class="meta-card">
+        <div class="stat-label">Meta Description</div>
+        <div class="stat-value ${m.metaDescription ? '' : 'warn'}">${m.metaDescription || '(missing)'}</div>
+      </div>
+    `;
+ 
+    // ── 2. AI Scores — real 1-10 values from server ──────────
+    const categories = [
+      { key: "seoStructure",     label: "SEO Structure"    },
+      { key: "messagingClarity", label: "Messaging Clarity"},
+      { key: "ctaUsage",         label: "CTA Usage"        },
+      { key: "contentDepth",     label: "Content Depth"    },
+      { key: "uxConcerns",       label: "UX / Structural"  },
+    ];
+    document.getElementById("catList").innerHTML = categories.map((c, i) => {
+      const cat   = analysis[c.key] || {};
+      const score = cat.score ?? "–";
+      const cls   = typeof score === "number" ? scoreClass(score) : "";
+      const preview = (cat.summary || "").slice(0, 90);
+      return `
+        <div class="cat-item ${i === 0 ? 'active' : ''}" onclick="showDetail('${c.key}', this)">
+          <div>
+            <div class="cat-name">${c.label}</div>
+            <div class="cat-preview">${preview}…</div>
+          </div>
+          <div class="cat-score ${cls}">${score}<span style="font-size:12px;font-weight:400">/10</span></div>
+        </div>`;
+    }).join("");
+ 
+    showDetail("seoStructure", document.querySelector(".cat-item"));
+ 
+    // ── 3. Recommendations — correct key ────────────────────
+    // FIX: was audit.prioritized_recommendations — correct key is analysis.recommendations
+    const recs = analysis.recommendations || [];
+    document.getElementById("recList").innerHTML = recs.length
+      ? recs.map(r => `
+          <div class="rec-item">
+            <div class="rec-priority">PRIORITY ${r.priority}</div>
+            <div class="rec-title">${r.recommendation}</div>
+            <div class="rec-text">${r.reasoning}</div>
+            <div class="rec-impact">↑ ${r.impact}</div>
+            ${r.metricRef ? `<div class="rec-metric">Metric: ${r.metricRef}</div>` : ""}
+          </div>`).join("")
+      : "<p style='color:#999;font-size:13px'>No recommendations returned.</p>";
+ 
+    document.getElementById("logTrace").textContent = JSON.stringify(data.promptLog, null, 2);
+    document.getElementById("results").style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+ 
+  function showDetail(key, el) {
+    if (!reportData) return;
+    const cat = (reportData.analysis || {})[key] || {};
+    document.querySelectorAll(".cat-item").forEach(i => i.classList.remove("active"));
+    if (el) el.classList.add("active");
+    const panel = document.getElementById("detailPanel");
+    panel.innerHTML = `
+      <h4>${key.replace(/([A-Z])/g, ' $1').trim()}</h4>
+      <p>${cat.summary || "No summary available."}</p>
+      <ul>${(cat.issues || []).map(i => `<li>${i}</li>`).join("")}</ul>`;
+    panel.style.display = "block";
+  }
+ 
+  function toggleLog() {
+    const log = document.getElementById("logTrace");
+    log.style.display = log.style.display === "block" ? "none" : "block";
+  }
+</script>
+</body>
+</html>
