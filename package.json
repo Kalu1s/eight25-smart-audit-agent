@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Kalu1s/eight25-smart-audit-agent#readme",
   "dependencies": {
+    "@google/genai": "^1.46.0",
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.13.6",
     "cheerio": "^1.2.0",
