@@ -143,7 +143,7 @@ See the UI's "Prompt Log" panel after running an audit. All prompts, inputs, raw
 - **Frontend:** Vanilla HTML/CSS/JS (no build step)
 
 
-### Prompt
+### Prompts
 Spec File + 
 You are an expert Website Strategist and SEO Consultant at EIGHT25MEDIA. Your goal is to provide high-impact, data-driven website audits focused on SEO, conversion optimization, and UX clarity.
 GUIDELINES:
@@ -182,3 +182,6 @@ TASK:
    - **Impact**: [Expected result for SEO or UX]
 
 Final Output must be specific and non-generic. Avoid "improve your SEO"; instead use "Increase H1 keyword density because the current H1 is 'Welcome' which lacks search intent."
+
+### Prompt 2
+check the accuracy and the improvements + server.js + index.html
